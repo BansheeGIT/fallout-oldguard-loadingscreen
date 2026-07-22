@@ -274,8 +274,13 @@ var CONFIG = {
   // Фон-постер. Положи картинку в img/bg.jpg (JPG, ~1920px, < 500 КБ).
   background: 'img/bg.jpg',
 
-  // Фоновая музыка (не обязательно). Файлы в audio/, играют по кругу.
-  tracks: [],            // напр. ['audio/ambient1.mp3','audio/ambient2.mp3']
+  // Фоновая музыка. Порядок каждый раз тасуется (см. блок «Музыка» внизу).
+  // Имена файлов — только латиница без пробелов: пробел в src ломает загрузку в CEF.
+  tracks: [
+    'audio/lets-face-the-music-and-dance.mp3',
+    'audio/my-baby-loves-to-swing.mp3',
+    'audio/when-lights-are-low.mp3'
+  ],
   volume: 0.20,
 
   // Данные сервера до того, как GMod пришлёт настоящие (GameDetails).
@@ -480,13 +485,33 @@ setTimeout(function(){ if (!inGmod) runDemo(); }, 1200);
 (function(){
   var bgm = $('bgm'), mute = $('mute');
   if (!CONFIG.tracks.length){ mute.style.display = 'none'; return; }
-  var idx = Math.floor(Math.random() * CONFIG.tracks.length);
+
+  /* Случайный порядок: тасуем список (Фишер–Йетс) и, когда он кончился, тасуем заново.
+     Так каждый заход на сервер звучит по-своему, но один и тот же трек не повторяется,
+     пока не сыграют остальные. При новой тасовке следим, чтобы первым не встал тот же,
+     что играл последним — иначе на стыке кругов трек прозвучал бы дважды подряд. */
+  var queue = [], idx = 0;
+
+  function shuffle(avoidFirst){
+    var list = CONFIG.tracks.slice();
+    for (var i = list.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = list[i]; list[i] = list[j]; list[j] = t;
+    }
+    if (list.length > 1 && avoidFirst && list[0] === avoidFirst){
+      list.push(list.shift());
+    }
+    return list;
+  }
+
+  queue = shuffle();
   bgm.volume = CONFIG.volume;
-  bgm.src = CONFIG.tracks[idx];
+  bgm.src = queue[0];
   bgm.loop = CONFIG.tracks.length === 1;
   bgm.addEventListener('ended', function(){
-    idx = (idx + 1) % CONFIG.tracks.length;
-    bgm.src = CONFIG.tracks[idx];
+    idx++;
+    if (idx >= queue.length){ queue = shuffle(queue[queue.length - 1]); idx = 0; }
+    bgm.src = queue[idx];
     bgm.play();
   });
   function tryPlay(){ var p = bgm.play(); if (p && p.catch) p.catch(function(){}); }
